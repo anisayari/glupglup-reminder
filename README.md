@@ -16,10 +16,17 @@ It lives in the top bar, animates a little droplet, plays a water sound when you
 
 ## Easy install 🚀
 
-1. Double-click [`Installer.command`](./Installer.command)
-2. The app is built locally
-3. It gets copied to `~/Applications/GlupGlup Reminder.app`
-4. It launches automatically
+1. Download the latest `.dmg` from the GitHub Releases page
+2. Open `GlupGlup-Reminder-1.0.0.dmg`
+3. Drag `GlupGlup Reminder.app` into `Applications`
+4. Launch it from Applications or Spotlight
+
+If macOS warns that the app is from an unidentified developer, use `Right click` -> `Open` once, or allow it in `System Settings > Privacy & Security`.
+
+## GitHub release 📦
+
+- Public repo: [anisayari/glupglup-reminder](https://github.com/anisayari/glupglup-reminder)
+- Releases: [Download the latest DMG](https://github.com/anisayari/glupglup-reminder/releases)
 
 ## Manual install 🛠️
 
@@ -34,6 +41,14 @@ It lives in the top bar, animates a little droplet, plays a water sound when you
 ```
 
 The app bundle is generated at `Build/GlupGlup Reminder.app`.
+
+## Build a DMG locally 💿
+
+```bash
+./Scripts/package_dmg.sh 1.0.0
+```
+
+The DMG is generated at `Build/GlupGlup-Reminder-1.0.0.dmg`.
 
 ## How to use 👀
 
