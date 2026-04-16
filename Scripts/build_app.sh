@@ -37,6 +37,7 @@ SWIFT_SOURCES=("$ROOT_DIR"/Sources/Glouglou/*.swift)
 xcrun swiftc \
   -framework AppKit \
   -framework Charts \
+  -framework ServiceManagement \
   -framework SwiftUI \
   -framework UserNotifications \
   -o "$MACOS_DIR/$EXECUTABLE_NAME" \

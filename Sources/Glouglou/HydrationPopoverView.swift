@@ -31,7 +31,10 @@ struct HydrationPopoverView: View {
         }
         .padding(18)
         .frame(width: 360)
-        .onAppear(perform: syncReminderSelectionFromStore)
+        .onAppear {
+            syncReminderSelectionFromStore()
+            store.refreshLaunchAtLoginState()
+        }
         .onChange(of: store.reminderIntervalMinutes) { _, _ in
             syncReminderSelectionFromStore()
         }
@@ -141,6 +144,16 @@ struct HydrationPopoverView: View {
 
                     Toggle(strings.enableRemindersTitle, isOn: remindersBinding)
 
+                    Toggle(strings.launchAtLoginTitle, isOn: launchAtLoginBinding)
+                        .disabled(!store.launchAtLoginSettingAvailable)
+
+                    if let launchAtLoginMessage = store.launchAtLoginStatusMessage {
+                        Text(launchAtLoginMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     Picker(strings.reminderIntervalTitle, selection: reminderSelectionBinding) {
                         ForEach(reminderOptions, id: \.self) { minutes in
                             Text(strings.reminderLabel(minutes))
@@ -168,6 +181,15 @@ struct HydrationPopoverView: View {
                             Stepper("", value: customReminderStepperBinding, in: 1...1_440)
                                 .labelsHidden()
                         }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        DatePicker(strings.resetTimeTitle, selection: resetTimeBinding, displayedComponents: .hourAndMinute)
+
+                        Text(strings.resetTimeDescription(store.resetTimeText))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Picker(strings.languageTitle, selection: languageBinding) {
@@ -236,6 +258,13 @@ struct HydrationPopoverView: View {
         )
     }
 
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { store.launchesAtLogin },
+            set: { store.setLaunchAtLoginEnabled($0) }
+        )
+    }
+
     private var reminderSelectionBinding: Binding<ReminderSelection> {
         Binding(
             get: { reminderSelection },
@@ -286,6 +315,13 @@ struct HydrationPopoverView: View {
         Binding(
             get: { store.language },
             set: { store.setLanguage($0) }
+        )
+    }
+
+    private var resetTimeBinding: Binding<Date> {
+        Binding(
+            get: { store.resetTimeDate },
+            set: { store.setResetTime($0) }
         )
     }
 

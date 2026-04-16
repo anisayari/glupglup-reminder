@@ -1,9 +1,11 @@
 import Foundation
+import ServiceManagement
 
 struct HydrationSettings: Codable {
     var dailyGoalGlasses: Int = 8
     var reminderIntervalMinutes: Int = 45
     var remindersEnabled: Bool = true
+    var resetMinutesAfterMidnight: Int = 0
     var history: [String: Int] = [:]
     var language: AppLanguage = .english
 
@@ -11,6 +13,7 @@ struct HydrationSettings: Codable {
         case dailyGoalGlasses
         case reminderIntervalMinutes
         case remindersEnabled
+        case resetMinutesAfterMidnight
         case history
         case language
     }
@@ -22,6 +25,7 @@ struct HydrationSettings: Codable {
         dailyGoalGlasses = try container.decodeIfPresent(Int.self, forKey: .dailyGoalGlasses) ?? 8
         reminderIntervalMinutes = try container.decodeIfPresent(Int.self, forKey: .reminderIntervalMinutes) ?? 45
         remindersEnabled = try container.decodeIfPresent(Bool.self, forKey: .remindersEnabled) ?? true
+        resetMinutesAfterMidnight = try container.decodeIfPresent(Int.self, forKey: .resetMinutesAfterMidnight) ?? 0
         history = try container.decodeIfPresent([String: Int].self, forKey: .history) ?? [:]
         language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .english
     }
@@ -36,6 +40,13 @@ struct ReminderSnapshot {
     let body: String
     let skipActionTitle: String
     let doneActionTitle: String
+}
+
+enum LaunchAtLoginState {
+    case disabled
+    case enabled
+    case requiresApproval
+    case unavailable
 }
 
 struct HydrationHistoryDay: Identifiable {
@@ -102,23 +113,26 @@ final class HydrationStore: ObservableObject {
     @Published private var state: HydrationSettings
     @Published private(set) var currentDayKey: String
     @Published private(set) var notificationsAuthorized = false
+    @Published private(set) var launchAtLoginState: LaunchAtLoginState = .unavailable
+    @Published private(set) var launchAtLoginErrorMessage: String?
 
     private let defaults = UserDefaults.standard
     private var reminderScheduler: ReminderScheduler?
     private var dayWatcher: Timer?
 
     init() {
-        let dayKey = Self.dayKey(for: Date())
-        currentDayKey = dayKey
-
         let loadedState = Self.loadState(from: defaults)
         var normalizedState = loadedState
+        normalizedState.resetMinutesAfterMidnight = Self.clampedResetMinutes(loadedState.resetMinutesAfterMidnight)
+        let dayKey = Self.dayKey(for: Date(), resetMinutesAfterMidnight: normalizedState.resetMinutesAfterMidnight)
+        currentDayKey = dayKey
         normalizedState.history = Self.prunedHistory(from: loadedState.history)
         normalizedState.history[dayKey] = normalizedState.history[dayKey] ?? 0
 
         state = normalizedState
 
         startDayWatcher()
+        refreshLaunchAtLoginState()
         save()
     }
 
@@ -142,6 +156,18 @@ final class HydrationStore: ObservableObject {
         state.reminderIntervalMinutes
     }
 
+    var resetMinutesAfterMidnight: Int {
+        state.resetMinutesAfterMidnight
+    }
+
+    var resetTimeDate: Date {
+        Self.clockDate(for: resetMinutesAfterMidnight)
+    }
+
+    var resetTimeText: String {
+        strings.formatClockTime(minutesAfterMidnight: resetMinutesAfterMidnight)
+    }
+
     var language: AppLanguage {
         state.language
     }
@@ -152,6 +178,34 @@ final class HydrationStore: ObservableObject {
 
     var goalReachedToday: Bool {
         todayCount >= dailyGoalGlasses
+    }
+
+    var launchesAtLogin: Bool {
+        switch launchAtLoginState {
+        case .enabled, .requiresApproval:
+            return true
+        case .disabled, .unavailable:
+            return false
+        }
+    }
+
+    var launchAtLoginSettingAvailable: Bool {
+        launchAtLoginState != .unavailable
+    }
+
+    var launchAtLoginStatusMessage: String? {
+        if let launchAtLoginErrorMessage, !launchAtLoginErrorMessage.isEmpty {
+            return launchAtLoginErrorMessage
+        }
+
+        switch launchAtLoginState {
+        case .requiresApproval:
+            return strings.launchAtLoginApprovalText
+        case .unavailable:
+            return strings.launchAtLoginUnavailableText
+        case .disabled, .enabled:
+            return nil
+        }
     }
 
     var progress: Double {
@@ -326,6 +380,15 @@ final class HydrationStore: ObservableObject {
         }
     }
 
+    func setResetTime(_ date: Date) {
+        let components = Calendar.autoupdatingCurrent.dateComponents([.hour, .minute], from: date)
+        let minutes = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+
+        mutate { state in
+            state.resetMinutesAfterMidnight = Self.clampedResetMinutes(minutes)
+        }
+    }
+
     func setRemindersEnabled(_ enabled: Bool) {
         mutate { state in
             state.remindersEnabled = enabled
@@ -335,6 +398,38 @@ final class HydrationStore: ObservableObject {
     func setLanguage(_ language: AppLanguage) {
         mutate { state in
             state.language = language
+        }
+    }
+
+    func setLaunchAtLoginEnabled(_ enabled: Bool) {
+        launchAtLoginErrorMessage = nil
+
+        do {
+            let service = SMAppService.mainApp
+            if enabled {
+                try service.register()
+            } else {
+                try service.unregister()
+            }
+        } catch {
+            launchAtLoginErrorMessage = error.localizedDescription
+        }
+
+        refreshLaunchAtLoginState()
+    }
+
+    func refreshLaunchAtLoginState() {
+        switch SMAppService.mainApp.status {
+        case .notRegistered:
+            launchAtLoginState = .disabled
+        case .enabled:
+            launchAtLoginState = .enabled
+        case .requiresApproval:
+            launchAtLoginState = .requiresApproval
+        case .notFound:
+            launchAtLoginState = .unavailable
+        @unknown default:
+            launchAtLoginState = .unavailable
         }
     }
 
@@ -358,20 +453,20 @@ final class HydrationStore: ObservableObject {
     }
 
     private func handlePossibleDayChange() {
-        let newDayKey = Self.dayKey(for: Date())
-        guard newDayKey != currentDayKey else {
+        guard syncCurrentDayKeyToSettings() else {
             return
         }
 
-        currentDayKey = newDayKey
         mutate { state in
-            state.history[newDayKey] = state.history[newDayKey] ?? 0
+            state.history[currentDayKey] = state.history[currentDayKey] ?? 0
         }
     }
 
     private func mutate(_ mutation: (inout HydrationSettings) -> Void) {
         mutation(&state)
+        state.resetMinutesAfterMidnight = Self.clampedResetMinutes(state.resetMinutesAfterMidnight)
         state.history = Self.prunedHistory(from: state.history)
+        _ = syncCurrentDayKeyToSettings()
         state.history[currentDayKey] = state.history[currentDayKey] ?? 0
         save()
         refreshReminders()
@@ -383,14 +478,14 @@ final class HydrationStore: ObservableObject {
 
     private func history(forLast dayCount: Int) -> [HydrationHistoryDay] {
         let calendar = Calendar.autoupdatingCurrent
-        let today = calendar.startOfDay(for: Date())
+        let today = Self.logicalDate(for: Date(), resetMinutesAfterMidnight: resetMinutesAfterMidnight)
 
         return (0..<dayCount).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -(dayCount - 1 - offset), to: today) else {
                 return nil
             }
 
-            let dayKey = Self.dayKey(for: date)
+            let dayKey = Self.dayKey(for: date, resetMinutesAfterMidnight: resetMinutesAfterMidnight)
             return HydrationHistoryDay(
                 date: date,
                 dayKey: dayKey,
@@ -435,7 +530,7 @@ final class HydrationStore: ObservableObject {
     }
 
     private func glasses(on date: Date) -> Int {
-        state.history[Self.dayKey(for: date)] ?? 0
+        state.history[Self.dayKey(for: date, resetMinutesAfterMidnight: resetMinutesAfterMidnight)] ?? 0
     }
 
     private static func loadState(from defaults: UserDefaults) -> HydrationSettings {
@@ -481,13 +576,23 @@ final class HydrationStore: ObservableObject {
         }
     }
 
-    private static func dayKey(for date: Date) -> String {
+    private func syncCurrentDayKeyToSettings() -> Bool {
+        let newDayKey = Self.dayKey(for: Date(), resetMinutesAfterMidnight: state.resetMinutesAfterMidnight)
+        guard newDayKey != currentDayKey else {
+            return false
+        }
+
+        currentDayKey = newDayKey
+        return true
+    }
+
+    private static func dayKey(for date: Date, resetMinutesAfterMidnight: Int) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar.autoupdatingCurrent
         formatter.locale = Locale.autoupdatingCurrent
         formatter.timeZone = .autoupdatingCurrent
         formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+        return formatter.string(from: logicalDate(for: date, resetMinutesAfterMidnight: resetMinutesAfterMidnight))
     }
 
     private static func date(from dayKey: String) -> Date? {
@@ -497,6 +602,34 @@ final class HydrationStore: ObservableObject {
         formatter.timeZone = .autoupdatingCurrent
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.date(from: dayKey)
+    }
+
+    private static func logicalDate(for date: Date, resetMinutesAfterMidnight: Int) -> Date {
+        let calendar = Calendar.autoupdatingCurrent
+        let startOfDay = calendar.startOfDay(for: date)
+        let components = calendar.dateComponents([.hour, .minute], from: date)
+        let currentMinutes = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+
+        if currentMinutes < clampedResetMinutes(resetMinutesAfterMidnight) {
+            return calendar.date(byAdding: .day, value: -1, to: startOfDay) ?? startOfDay
+        }
+
+        return startOfDay
+    }
+
+    private static func clockDate(for minutesAfterMidnight: Int) -> Date {
+        let calendar = Calendar.autoupdatingCurrent
+        let now = Date()
+        let clampedMinutes = clampedResetMinutes(minutesAfterMidnight)
+        var components = calendar.dateComponents([.year, .month, .day], from: now)
+        components.hour = clampedMinutes / 60
+        components.minute = clampedMinutes % 60
+        components.second = 0
+        return calendar.date(from: components) ?? now
+    }
+
+    private static func clampedResetMinutes(_ minutes: Int) -> Int {
+        min(max(minutes, 0), 1_439)
     }
 
 }

@@ -43,6 +43,23 @@ struct AppStrings {
         ) + " L"
     }
 
+    func formatClockTime(minutesAfterMidnight: Int) -> String {
+        let calendar = Calendar.autoupdatingCurrent
+        let now = Date()
+        let clampedMinutes = min(max(minutesAfterMidnight, 0), 1_439)
+        var components = calendar.dateComponents([.year, .month, .day], from: now)
+        components.hour = clampedMinutes / 60
+        components.minute = clampedMinutes % 60
+        components.second = 0
+
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter.string(from: calendar.date(from: components) ?? now)
+    }
+
     func glassWord(_ count: Int) -> String {
         if isFrench {
             return count > 1 ? "verres" : "verre"
@@ -224,6 +241,38 @@ struct AppStrings {
 
     var customReminderValueTitle: String {
         isFrench ? "Minutes personnalisees" : "Custom minutes"
+    }
+
+    var launchAtLoginTitle: String {
+        isFrench ? "Lancer au demarrage" : "Launch at login"
+    }
+
+    var launchAtLoginApprovalText: String {
+        if isFrench {
+            return "macOS attend encore une validation dans Reglages Systeme > General > Ouverture."
+        }
+
+        return "macOS still needs approval in System Settings > General > Login Items."
+    }
+
+    var launchAtLoginUnavailableText: String {
+        if isFrench {
+            return "Place GlupGlup Reminder dans Applications pour activer le lancement au demarrage."
+        }
+
+        return "Move GlupGlup Reminder to Applications to enable launch at login."
+    }
+
+    var resetTimeTitle: String {
+        isFrench ? "Heure de reset" : "Daily reset time"
+    }
+
+    func resetTimeDescription(_ resetTimeText: String) -> String {
+        if isFrench {
+            return "Le compteur repart chaque jour a \(resetTimeText)."
+        }
+
+        return "The daily count rolls over every day at \(resetTimeText)."
     }
 
     var minuteUnitShort: String {

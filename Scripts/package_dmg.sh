@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_NAME="GlupGlup Reminder"
-VERSION="${1:-1.0.1}"
+VERSION="${1:-1.0.2}"
 BUILD_DIR="$ROOT_DIR/Build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 DMG_STAGING="$BUILD_DIR/dmg-root"

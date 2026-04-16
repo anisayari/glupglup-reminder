@@ -46,7 +46,7 @@ final class StatusBarController: NSObject {
 
     private func configurePopover() {
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 360, height: 470)
+        popover.contentSize = NSSize(width: 360, height: 560)
         popover.contentViewController = NSHostingController(
             rootView: HydrationPopoverView(
                 store: store,
