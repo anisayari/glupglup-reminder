@@ -1,11 +1,20 @@
 import Foundation
 import UserNotifications
 
+enum ReminderAction {
+    case skip
+    case done
+}
+
 final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
     static let notificationIdentifier = "glupglup.reminder.water"
+    static let notificationCategoryIdentifier = "glupglup.reminder.actions"
+    static let skipActionIdentifier = "glupglup.reminder.skip"
+    static let doneActionIdentifier = "glupglup.reminder.done"
     static let notificationSoundName = UNNotificationSoundName("water-drop.wav")
 
     var authorizationDidChange: ((Bool) -> Void)?
+    var actionHandler: ((ReminderAction) -> Void)?
 
     private let center = UNUserNotificationCenter.current()
     private(set) var isAuthorized = false
@@ -68,7 +77,10 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
         content.sound = Bundle.main.url(forResource: "water-drop", withExtension: "wav") != nil
             ? UNNotificationSound(named: Self.notificationSoundName)
             : .default
+        content.categoryIdentifier = Self.notificationCategoryIdentifier
         content.threadIdentifier = "glupglup.reminders"
+
+        registerActions(using: snapshot)
 
         let interval = TimeInterval(max(snapshot.reminderIntervalMinutes, 1) * 60)
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: true)
@@ -88,10 +100,48 @@ final class ReminderScheduler: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        switch response.actionIdentifier {
+        case Self.skipActionIdentifier:
+            DispatchQueue.main.async {
+                self.actionHandler?(.skip)
+                completionHandler()
+            }
+        case Self.doneActionIdentifier:
+            DispatchQueue.main.async {
+                self.actionHandler?(.done)
+                completionHandler()
+            }
+        default:
+            completionHandler()
+        }
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+
+    private func registerActions(using snapshot: ReminderSnapshot) {
+        let skipAction = UNNotificationAction(
+            identifier: Self.skipActionIdentifier,
+            title: snapshot.skipActionTitle
+        )
+        let doneAction = UNNotificationAction(
+            identifier: Self.doneActionIdentifier,
+            title: snapshot.doneActionTitle
+        )
+        let category = UNNotificationCategory(
+            identifier: Self.notificationCategoryIdentifier,
+            actions: [skipAction, doneAction],
+            intentIdentifiers: []
+        )
+        center.setNotificationCategories([category])
     }
 
     private func updateAuthorization(_ authorized: Bool) {

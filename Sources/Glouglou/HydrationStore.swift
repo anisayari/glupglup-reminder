@@ -34,6 +34,8 @@ struct ReminderSnapshot {
     let reminderIntervalMinutes: Int
     let title: String
     let body: String
+    let skipActionTitle: String
+    let doneActionTitle: String
 }
 
 struct HydrationHistoryDay: Identifiable {
@@ -418,7 +420,9 @@ final class HydrationStore: ObservableObject {
             dailyGoalGlasses: dailyGoalGlasses,
             reminderIntervalMinutes: reminderIntervalMinutes,
             title: strings.notificationTitle,
-            body: strings.notificationBody(todayCount: todayCount, dailyGoalGlasses: dailyGoalGlasses)
+            body: strings.notificationBody(todayCount: todayCount, dailyGoalGlasses: dailyGoalGlasses),
+            skipActionTitle: strings.notificationSkipActionTitle,
+            doneActionTitle: strings.notificationDoneActionTitle
         )
     }
 

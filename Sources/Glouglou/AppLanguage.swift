@@ -146,6 +146,14 @@ struct AppStrings {
         "GlupGlup Reminder"
     }
 
+    var notificationSkipActionTitle: String {
+        isFrench ? "Passer" : "Skip"
+    }
+
+    var notificationDoneActionTitle: String {
+        isFrench ? "C'est fait !" : "Done!"
+    }
+
     var statusTooltip: String {
         if isFrench {
             return "Clic: +1 verre • Option-clic: -1 verre • Clic droit: stats et config"

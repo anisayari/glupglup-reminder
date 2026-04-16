@@ -12,12 +12,19 @@ MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 ICONSET_DIR="$BUILD_DIR/AppIcon.iconset"
 ICON_FILE="$BUILD_DIR/AppIcon.icns"
+CUSTOM_SOUND_SOURCE="$HOME/Downloads/water-drip.wav"
+SOUND_FILE="$ROOT_DIR/Resources/water-drop.wav"
 
 rm -rf "$APP_DIR" "$ICONSET_DIR" "$ICON_FILE"
 mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
-swift "$ROOT_DIR/Scripts/generate_sound.swift" "$ROOT_DIR/Resources/water-drop.wav"
+if [[ -f "$CUSTOM_SOUND_SOURCE" ]]; then
+  cp "$CUSTOM_SOUND_SOURCE" "$SOUND_FILE"
+elif [[ ! -f "$SOUND_FILE" ]]; then
+  swift "$ROOT_DIR/Scripts/generate_sound.swift" "$SOUND_FILE"
+fi
+
 swift "$ROOT_DIR/Scripts/generate_app_icon.swift" "$ICONSET_DIR"
 iconutil --convert icns --output "$ICON_FILE" "$ICONSET_DIR"
 

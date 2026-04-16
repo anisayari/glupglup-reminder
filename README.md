@@ -9,15 +9,16 @@ It lives in the top bar, animates a little droplet, plays a water sound when you
 - 💦 Animated menu bar droplet
 - 🥤 One-click water tracking
 - 🔔 Reminder presets + custom interval in minutes
+- ✅ Notification actions: `Skip` or `Done!`
 - 📈 History window with chart, heatmap, and recent-day summary
 - 🎯 Daily goal, streak, and lightweight gamification
 - 🌍 English by default, with optional French UI
-- 🔊 Small water-drop sound on clicks and reminders
+- 🔊 Custom water-drop sound on clicks, `Done!`, and reminders
 
 ## Easy install 🚀
 
 1. Download the latest `.dmg` from the GitHub Releases page
-2. Open `GlupGlup-Reminder-1.0.0.dmg`
+2. Open `GlupGlup-Reminder-1.0.1.dmg`
 3. Drag `GlupGlup Reminder.app` into `Applications`
 4. Launch it from Applications or Spotlight
 
@@ -45,10 +46,10 @@ The app bundle is generated at `Build/GlupGlup Reminder.app`.
 ## Build a DMG locally 💿
 
 ```bash
-./Scripts/package_dmg.sh 1.0.0
+./Scripts/package_dmg.sh 1.0.1
 ```
 
-The DMG is generated at `Build/GlupGlup-Reminder-1.0.0.dmg`.
+The DMG is generated at `Build/GlupGlup-Reminder-1.0.1.dmg`.
 
 ## How to use 👀
 

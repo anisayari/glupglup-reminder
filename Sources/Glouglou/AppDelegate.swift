@@ -10,6 +10,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let store = HydrationStore()
         let scheduler = ReminderScheduler()
 
+        scheduler.actionHandler = { [weak store] action in
+            guard let store else {
+                return
+            }
+
+            switch action {
+            case .skip:
+                break
+            case .done:
+                store.addGlass()
+                WaterSoundPlayer.shared.playDrop()
+            }
+        }
+
         store.connectReminderScheduler(scheduler)
 
         self.store = store
